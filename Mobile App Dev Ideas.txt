@@ -1,0 +1,24 @@
+Mobile App Dev Ideas
+
+MTG card checker (maybe tell price)
+IDEA:
+Scan card with a camera and see the cards price and legality in formats.
+Also, have option to maybe show cards with synergy (?)
+orderBy function to show other similar cards
+Can also see the multiverseID to see what set the card belongs to
+
+- https://mtgjson.com/downloads/all-files/#allprices
+- https://docs.magicthegathering.io/
+
+
+Events going on in X town
+IDEA:
+Geographical data
+show user events going on/will go on in the town they are at
+
+- https://www.eventbrite.com/platform/api/
+- https://platform.seatgeek.com/
+- http://developer.ticketmaster.com/products-and-docs/apis/getting-started/
+- https://wiki.openstreetmap.org/wiki/API
+- https://postcodes.io/
+- https://developer.what3words.com/public-api
