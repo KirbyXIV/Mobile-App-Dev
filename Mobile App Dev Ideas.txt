@@ -1,5 +1,22 @@
 Mobile App Dev Ideas
 
+Territory Battle Walks
+IDEA:
+Walk around your city/campus to find and battle bosses in different GPS-based territories. Steps = damage to bosses. Each boss has unique mechanics (night-only damage, requires fast walking, needs multiple territory visits, etc.). Beat bosses to claim territories on a map. Territories decay over time so you need to patrol them by walking through regularly or boss respawns. Defeated bosses join your collection and give passive buffs (e.g. morning damage bonus, decay resistance). Connected territories form kingdoms with bonus effects.
+
+Mental health focus - gamifies daily walking for motivation, clear goals, visible progress. Good for ADHD/depression.
+
+Mobile-only: GPS for territories, pedometer for step counting, background tracking, location notifications, used while walking around.
+
+APIs/Features:
+- Google Maps API / OpenStreetMap for territory display
+- Geofencing API for territory detection
+- Pedometer/Accelerometer API for step counting
+- Local notifications
+- Background services
+- Persistent local storage for boss collection/progress
+- Optional: Compass for pointing at territories
+
 MTG card checker (maybe tell price)
 IDEA:
 Scan card with a camera and see the cards price and legality in formats.
