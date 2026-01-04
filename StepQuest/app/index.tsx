@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import MapView, { Polygon, PROVIDER_GOOGLE } from 'react-native-maps';
@@ -17,11 +17,9 @@ interface Territory {
 
 // --- Constants ---
 const GRID_SIZE = 0.01; // Size of each grid cell (approx. 1.1km)
-const GRID_RADIUS = 2;   // How many cells to generate in each direction (creates an 11x11 grid)
+const GRID_RADIUS = 2;   // How many cells to generate in each direction (creates a 5x5 grid)
 
-const CURRENT_STEPS = 3500;
 const GOAL_STEPS = 5000;
-const PROGRESS = Math.min(CURRENT_STEPS / GOAL_STEPS, 1);
 
 const TERRITORY_COLORS = {
   owned: 'rgba(0, 0, 255, 0.3)',   // Blue
@@ -39,8 +37,21 @@ export default function Index() {
   const [location, setLocation] = useState<Location.LocationObject | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [territories, setTerritories] = useState<Territory[]>([]);
+  
+  // Pedometer State
+  const [currentSteps, setCurrentSteps] = useState(0);
+  const [isPedometerAvailable, setIsPedometerAvailable] = useState('checking');
+  
   const mapRef = useRef<MapView>(null);
+  const router = useRouter();
 
+  // Calculate progress dynamically
+  const progress = Math.min(currentSteps / GOAL_STEPS, 1);
+
+  // --- Pedometer Effect ---
+  
+
+  // --- Location Effect ---
   useEffect(() => {
     (async () => {
       let { status } = await Location.requestForegroundPermissionsAsync();
@@ -51,21 +62,42 @@ export default function Index() {
 
       let currentLocation = await Location.getCurrentPositionAsync({});
       setLocation(currentLocation);
-      generateGrid(currentLocation.coords);
+      // Initial grid generation based on initial location and default zoom
+      generateGrid({
+        latitude: currentLocation.coords.latitude,
+        longitude: currentLocation.coords.longitude,
+        latitudeDelta: 0.01,
+        longitudeDelta: 0.01
+      });
     })();
   }, []);
 
-  const generateGrid = (coords: { latitude: number; longitude: number }) => {
+  const generateGrid = (region: { latitude: number; longitude: number; latitudeDelta: number; longitudeDelta: number }) => {
+    // Zoom level check: If zoomed out too far (delta > 0.05), hide territories
+    if (region.latitudeDelta > 0.1) {
+      setTerritories([]);
+      return;
+    }
+
     const newTerritories: Territory[] = [];
     
-    // Snap user location to a grid to keep territories consistent
-    const startLat = Math.floor(coords.latitude / GRID_SIZE) * GRID_SIZE;
-    const startLong = Math.floor(coords.longitude / GRID_SIZE) * GRID_SIZE;
+    // Calculate visible bounds with a small buffer to ensure smooth scrolling
+    const buffer = 0.01;
+    const minLat = region.latitude - region.latitudeDelta / 2 - buffer;
+    const maxLat = region.latitude + region.latitudeDelta / 2 + buffer;
+    const minLong = region.longitude - region.longitudeDelta / 2 - buffer;
+    const maxLong = region.longitude + region.longitudeDelta / 2 + buffer;
 
-    for (let x = -GRID_RADIUS; x <= GRID_RADIUS; x++) {
-      for (let y = -GRID_RADIUS; y <= GRID_RADIUS; y++) {
-        const cellLat = startLat + (x * GRID_SIZE);
-        const cellLong = startLong + (y * GRID_SIZE);
+    // Determine grid index range
+    const startX = Math.floor(minLat / GRID_SIZE);
+    const endX = Math.ceil(maxLat / GRID_SIZE);
+    const startY = Math.floor(minLong / GRID_SIZE);
+    const endY = Math.ceil(maxLong / GRID_SIZE);
+
+    for (let x = startX; x <= endX; x++) {
+      for (let y = startY; y <= endY; y++) {
+        const cellLat = x * GRID_SIZE;
+        const cellLong = y * GRID_SIZE;
 
         // Define the 4 corners of the square
         const squareCoords = [
@@ -74,8 +106,12 @@ export default function Index() {
           { latitude: cellLat + GRID_SIZE, longitude: cellLong + GRID_SIZE },
           { latitude: cellLat, longitude: cellLong + GRID_SIZE },
         ];
-        // Randomly assign type for demonstration
-        const rand = Math.random();
+        
+        // Deterministic random generation based on grid coordinates
+        // This ensures the same cell always has the same type
+        const seed = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453;
+        const rand = seed - Math.floor(seed);
+        
         let type: TerritoryType = 'neutral';
         if (rand > 0.7) type = 'enemy';
         else if (rand > 0.5) type = 'owned';
@@ -105,6 +141,13 @@ export default function Index() {
     if (mapRef.current) {
       mapRef.current.animateCamera({ heading: 0 });
     }
+  };
+
+  const handleTerritoryPress = (territory: Territory) => {
+    router.push({
+      pathname: "/screens/territoryScreen" as any,
+      params: { id: territory.id, type: territory.type }
+    });
   };
 
   if (errorMsg) {
@@ -142,6 +185,7 @@ export default function Index() {
         showsUserLocation={true}
         showsMyLocationButton={false} // Hide default
         showsCompass={false}          // Hide default
+        onRegionChangeComplete={generateGrid}
       >
         {territories.map((territory) => (
           <React.Fragment key={territory.id}>
@@ -151,6 +195,8 @@ export default function Index() {
               fillColor={TERRITORY_COLORS[territory.type]}
               strokeColor={TERRITORY_BORDER_COLORS[territory.type]}
               strokeWidth={2}
+              tappable={true}
+              onPress={() => handleTerritoryPress(territory)}
             />
           </React.Fragment>
         ))}
@@ -173,7 +219,8 @@ export default function Index() {
             </View>
             
             <View style={styles.topRightButtons}>
-              <TouchableOpacity style={styles.iconButton}>
+              <TouchableOpacity style={styles.iconButton} onPress={() => router.push(
+                { pathname: 'screens/profile' as any})}>
                 <Ionicons name="person-circle-outline" size={28} color="#333" />
               </TouchableOpacity>
               <TouchableOpacity style={styles.iconButton}>
@@ -198,14 +245,14 @@ export default function Index() {
           <View style={styles.bottomBar}>
             <View style={styles.stepInfo}>
               <Text style={styles.stepLabel}>Daily Steps</Text>
-              <Text style={styles.stepCount}>{CURRENT_STEPS} / {GOAL_STEPS}</Text>
+              <Text style={styles.stepCount}>{currentSteps} / {GOAL_STEPS}</Text>
             </View>
             
             <View style={styles.progressContainer}>
               <View style={styles.progressBarBackground}>
-                <View style={[styles.progressBarFill, { width: `${PROGRESS * 100}%` }]} />
+                <View style={[styles.progressBarFill, { width: `${progress * 100}%` }]} />
               </View>
-              <Text style={styles.progressText}>{Math.round(PROGRESS * 100)}%</Text>
+              <Text style={styles.progressText}>{Math.round(progress * 100)}%</Text>
             </View>
           </View>
         </View>
@@ -218,7 +265,7 @@ export default function Index() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: 'white',
   },
   map: {
     ...StyleSheet.absoluteFillObject, // This makes the map fill the screen behind everything
@@ -234,7 +281,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 10,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    backgroundColor: 'white',
     marginHorizontal: 16,
     marginTop: 10,
     borderRadius: 16,
@@ -263,14 +310,14 @@ const styles = StyleSheet.create({
   },
   // Map Controls Styles
   mapControls: {
-    flexDirection: 'row',
+    flexDirection: 'row', // Changed to row
     justifyContent: 'flex-end', // Align to the right
     marginRight: 16,
     marginTop: 10,
     gap: 10,
   },
   controlButton: {
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    backgroundColor: 'white',
     padding: 8,
     borderRadius: 20,
     shadowColor: '#000',
@@ -331,6 +378,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: 'bold',
     color: '#4CAF50',
-    minWidth: 35, // Ensure text doesn't jump around too much
+    minWidth:  35,
   },
 });
